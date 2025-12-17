@@ -8,13 +8,6 @@ import numpy as np
 from tqdm import tqdm
 from apply_transforms import read_transforms_from_csv
 
-def calculate_mean_max_fd(points, transform, prev_points):
-    curr_points = np.array([transform.TransformPoint(p) for p in points])
-    distances = np.linalg.norm(curr_points - prev_points, axis=1)
-    mean_fd = np.mean(distances)
-    max_fd = np.max(distances)
-    return mean_fd, max_fd
-
 def calculate_framewise_displacement(mask_file, csv_file, output_csv=None, verbose=False):
     if verbose:
         print(f"Reading mask: {mask_file}")
@@ -53,17 +46,19 @@ def calculate_framewise_displacement(mask_file, csv_file, output_csv=None, verbo
     t0 = transforms[0]
     prev_points = np.array([t0.TransformPoint(p) for p in points])
     
-    # First timepoint (t=0) has 0 displacement
+    # First timepoint (t=0) has 0 displacement by definition
     results.append({
         "timepoint": 0,
         "mean_fd": 0.0,
         "max_fd": 0.0
     })
 
+    # Loop over each index looking forwards
     for i in tqdm(range(len(transforms) - 1)):
         # t = i+1
         t_next = transforms[i+1]
         
+        # We use the direct transform here because transforming points uses the opposite direction as resampling images
         curr_points = np.array([t_next.TransformPoint(p) for p in points])
         
         # Calculate distances
