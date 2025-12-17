@@ -75,12 +75,13 @@ def calculate_framewise_displacement(mask_file, csv_file, output_csv=None, verbo
         
         prev_points = curr_points
 
-    with open(output_csv, 'w', newline='') as f:
-        import csv
-        writer = csv.writer(f)
-        writer.writerow(["Timepoint", "MeanFD", "MaxFD"])
-        for res in results:
-            writer.writerow([
+    if output_csv:
+        with open(output_csv, 'w', newline='') as f:
+            import csv
+            writer = csv.writer(f)
+            writer.writerow(["Timepoint", "MeanFD", "MaxFD"])
+            for res in results:
+                writer.writerow([
                     res['timepoint'],
                     res['mean_fd'],
                     res['max_fd']
@@ -89,7 +90,7 @@ def calculate_framewise_displacement(mask_file, csv_file, output_csv=None, verbo
     return results
 
 def main():
-    parser = argparse.ArgumentParser(description="Calculate Framewise Displacement from moco.csv and mask using Maurer Distance Map difference.")
+    parser = argparse.ArgumentParser(description="Calculate Framewise Displacement from moco.csv and mask using point tracking.")
     parser.add_argument("mask_file", help="Binary mask file in mean space (NIfTI)")
     parser.add_argument("csv_file", help="moco.csv file containing transforms")
     parser.add_argument("--output_csv", help="Optional output CSV for FD values", default=None)
