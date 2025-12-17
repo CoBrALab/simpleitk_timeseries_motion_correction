@@ -25,6 +25,10 @@ def calculate_framewise_displacement(mask_file, csv_file, output_csv=None, verbo
         pt = mask.TransformIndexToPhysicalPoint((int(x), int(y), int(z)))
         points.append(pt)
     
+    if len(points) == 0:
+        print("No points found in mask.")
+        return []
+
     if verbose:
         print(f"ROI contains {len(points)} voxels.")
     
