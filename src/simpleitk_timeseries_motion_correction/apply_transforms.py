@@ -74,6 +74,50 @@ def resample_volume(volume, reference, transform, interpolation=sitk.sitkBSpline
     return resampled
 
 
+def framewise_resample_volume(input_image, reference_image, transforms, interpolation=sitk.sitkBSpline5, clip_negative=True, extrapolator=True):
+    num_volumes = input_image.GetSize()[3]
+    # Extract 3D volumes from input to process in parallel
+    input_volumes = []
+    size_4d = input_image.GetSize()
+    for i in range(num_volumes):
+        extractor = sitk.ExtractImageFilter()
+        extractor.SetSize([size_4d[0], size_4d[1], size_4d[2], 0])
+        extractor.SetIndex([0, 0, 0, i])
+        input_volumes.append(extractor.Execute(input_image))
+    
+    resampled_volumes = [None] * num_volumes
+    
+    # Parallel processing
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        with tqdm(total=num_volumes) as pbar:
+            futures = {}
+            for i in range(num_volumes):
+                future = executor.submit(
+                    resample_volume,
+                    volume=input_volumes[i],
+                    reference=reference_image,
+                    transform=transforms[i],
+                    interpolation=interpolation,
+                    clip_negative=clip_negative,
+                    extrapolator=extrapolator,
+                )
+                futures[future] = i
+            
+            for future in concurrent.futures.as_completed(futures):
+                i = futures[future]
+                try:
+                    resampled_volumes[i] = future.result()
+                except Exception as e:
+                    print(f"Error processing volume {i}: {e}")
+                    # Might want to abort or insert blank?
+                    # For now re-raise to fail fast
+                    raise e
+                pbar.update(1)
+
+    print("Joining series...")
+    return sitk.JoinSeries(resampled_volumes)
+
+
 def main(args):
     # Create output directory if it doesn't exist
     output_dir = os.path.dirname(args.output_file)
@@ -106,44 +150,7 @@ def main(args):
         raise ValueError(f"Number of transforms ({len(transforms)}) does not match input volumes ({num_volumes}).")
 
     print("Resampling volumes...")
-    
-    # Extract 3D volumes from input to process in parallel
-    input_volumes = []
-    size_4d = input_image.GetSize()
-    for i in range(num_volumes):
-        extractor = sitk.ExtractImageFilter()
-        extractor.SetSize([size_4d[0], size_4d[1], size_4d[2], 0])
-        extractor.SetIndex([0, 0, 0, i])
-        input_volumes.append(extractor.Execute(input_image))
-    
-    resampled_volumes = [None] * num_volumes
-    
-    # Parallel processing
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        with tqdm(total=num_volumes) as pbar:
-            futures = {}
-            for i in range(num_volumes):
-                future = executor.submit(
-                    resample_volume,
-                    volume=input_volumes[i],
-                    reference=reference_image,
-                    transform=transforms[i] 
-                )
-                futures[future] = i
-            
-            for future in concurrent.futures.as_completed(futures):
-                i = futures[future]
-                try:
-                    resampled_volumes[i] = future.result()
-                except Exception as e:
-                    print(f"Error processing volume {i}: {e}")
-                    # Might want to abort or insert blank?
-                    # For now re-raise to fail fast
-                    raise e
-                pbar.update(1)
-
-    print("Joining series...")
-    output_image = sitk.JoinSeries(resampled_volumes)
+    output_image = framewise_resample_volume(input_image, reference_image, transforms, interpolation=sitk.sitkBSpline5, clip_negative=True, extrapolator=True)
     
     print(f"Writing output to: {args.output_file}")
     sitk.WriteImage(output_image, args.output_file)
