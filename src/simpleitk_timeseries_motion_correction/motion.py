@@ -85,29 +85,32 @@ def isotropic_upsample_and_pad(image, interpolation=sitk.sitkBSpline5, clip_nega
     """
     original_spacing = image.GetSpacing()
     min_spacing = min(original_spacing)
+    if original_spacing==(min_spacing,min_spacing,min_spacing):
+        # the image is already isotropic
+        resampled_image = image
+    else:
+        # Compute new size to maintain physical extent
+        original_size = image.GetSize()
+        new_size = [
+            int(round(original_size[i] * original_spacing[i] / min_spacing))
+            for i in range(len(original_spacing))
+        ]
 
-    # Compute new size to maintain physical extent
-    original_size = image.GetSize()
-    new_size = [
-        int(round(original_size[i] * original_spacing[i] / min_spacing))
-        for i in range(len(original_spacing))
-    ]
-
-    # Resample
-    resampled_image = sitk.Resample(
-        image,
-        new_size,
-        sitk.Transform(),  # Identity transform
-        interpolation,
-        image.GetOrigin(),
-        (min_spacing,) * len(original_spacing),
-        image.GetDirection(),
-        0,  # Default pixel value
-        image.GetPixelID(),
-        useNearestNeighborExtrapolator=extrapolator
-    )
-    if clip_negative:
-        resampled_slice = resampled_slice*sitk.Cast(resampled_slice>0, resampled_slice.GetPixelID())    
+        # Resample
+        resampled_image = sitk.Resample(
+            image,
+            new_size,
+            sitk.Transform(),  # Identity transform
+            interpolation,
+            image.GetOrigin(),
+            (min_spacing,) * len(original_spacing),
+            image.GetDirection(),
+            0,  # Default pixel value
+            image.GetPixelID(),
+            useNearestNeighborExtrapolator=extrapolator
+        )
+        if clip_negative:
+            resampled_image = resampled_image*sitk.Cast(resampled_image>0, resampled_image.GetPixelID())    
     # Duplicate the outer slice of the image twice to pad it.
     dim = image.GetDimension()
     resampled_image = sitk.MirrorPad(
