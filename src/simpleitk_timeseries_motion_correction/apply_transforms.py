@@ -69,7 +69,7 @@ def resample_volume(volume, reference, transform, interpolation=sitk.sitkBSpline
         volume.GetPixelID(),
         useNearestNeighborExtrapolator=True
     )
-    resampled[resampled < 0] = 0
+    resampled = resampled*sitk.Cast(resampled>0, resampled.GetPixelID())    
     return resampled
 
 
