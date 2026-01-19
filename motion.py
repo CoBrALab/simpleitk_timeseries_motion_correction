@@ -6,7 +6,7 @@ import numpy as np
 import concurrent.futures
 from tqdm import tqdm
 import csv
-
+from apply_transforms import resample_image
 
 def write_transforms_to_csv(transforms, output_file):
     """
@@ -140,20 +140,6 @@ def voxelwise_std(image_list):
     std_image = sitk.GetImageFromArray(std_array)
     std_image.CopyInformation(image_list[0])
     return std_image
-
-
-def resample_image(reference, moving, transform, interp=sitk.sitkBSpline5):
-    resampled = sitk.Resample(
-        moving,
-        reference,
-        transform,
-        interp,
-        0.0,
-        sitk.sitkFloat32,
-        useNearestNeighborExtrapolator=True,
-    )
-    resampled_slice = resampled_slice*sitk.Cast(resampled_slice>0, resampled_slice.GetPixelID())        
-    return resampled
 
 
 def register_pair(
