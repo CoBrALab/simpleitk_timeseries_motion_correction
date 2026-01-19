@@ -106,7 +106,7 @@ def isotropic_upsample_and_pad(image, interpolation=sitk.sitkBSpline5):
         image.GetPixelID(),
         useNearestNeighborExtrapolator=True,
     )
-    resampled_image[resampled_image < 0] = 0
+    resampled_slice = resampled_slice*sitk.Cast(resampled_slice>0, resampled_slice.GetPixelID())    
     # Duplicate the outer slice of the image twice to pad it.
     dim = image.GetDimension()
     resampled_image = sitk.MirrorPad(
@@ -152,7 +152,7 @@ def resample_image(reference, moving, transform, interp=sitk.sitkBSpline5):
         sitk.sitkFloat32,
         useNearestNeighborExtrapolator=True,
     )
-    resampled[resampled < 0] = 0
+    resampled_slice = resampled_slice*sitk.Cast(resampled_slice>0, resampled_slice.GetPixelID())        
     return resampled
 
 
@@ -389,7 +389,8 @@ def resample_slice_pair(
             reference.GetPixelID(),
             useNearestNeighborExtrapolator=True,
         )
-        resampled_slice[resampled_slice < 0] = 0
+        # set all negative values to 0
+        resampled_slice = resampled_slice*sitk.Cast(resampled_slice>0, resampled_slice.GetPixelID())    
         if slice_direction == 2:
             output_image[:, :, z] = resampled_slice
         elif slice_direction == 1:
