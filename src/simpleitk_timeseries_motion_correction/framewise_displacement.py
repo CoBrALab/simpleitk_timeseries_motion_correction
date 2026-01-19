@@ -6,7 +6,7 @@ import os
 import sys
 import numpy as np
 from tqdm import tqdm
-from apply_transforms import read_transforms_from_csv
+from .apply_transforms import read_transforms_from_csv
 
 def calculate_framewise_displacement(mask_file, csv_file, output_csv=None, verbose=False):
     if verbose:
