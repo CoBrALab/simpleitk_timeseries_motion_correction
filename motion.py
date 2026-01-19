@@ -453,6 +453,60 @@ def resample_slice_pair(
     return output_image
 
 
+def framewise_register_pair(moving_img, ref_img, level=1,interpolation=sitk.sitkBSpline5):
+    # the input can be either a nifti file or an SITK image
+    if isinstance(moving_img, sitk.Image):
+        moving_img = moving_img
+    elif os.path.isfile(moving_img):
+        moving_img = sitk.ReadImage(moving_img, sitk.sitkFloat32)
+    else:
+        raise ValueError(f'{moving_img} is neither a file nor an SITK image.')
+
+    # the input can be either a nifti file or an SITK image
+    if isinstance(ref_img, sitk.Image):
+        ref_img = ref_img
+    elif os.path.isfile(ref_img):
+        ref_img = sitk.ReadImage(ref_img, sitk.sitkFloat32)
+    else:
+        raise ValueError(f'{ref_img} is neither a file nor an SITK image.')
+
+    fixed_upsample = isotropic_upsample_and_pad(ref_img, interpolation)
+
+    size_4d = moving_img.GetSize()
+    num_volumes = size_4d[3]
+
+    # Extract 3D volumes
+    volumes = []
+    for i in range(num_volumes):
+        extractor = sitk.ExtractImageFilter()
+        extractor.SetSize([size_4d[0], size_4d[1], size_4d[2], 0])
+        extractor.SetIndex([0, 0, 0, i])
+        volumes.append(extractor.Execute(moving_img))
+
+    del extractor
+
+    transforms = [None] * num_volumes
+    # Parallel Registration
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        with tqdm(total=num_volumes - 1) as pbar:
+            futures = {}
+            for i in range(0, num_volumes):
+                future = executor.submit(
+                    register_pair,
+                    fixed=fixed_upsample,
+                    moving=volumes[i],
+                    fixed_mask=None,
+                    level=level,
+                )
+                futures[future] = i
+            # Collect results
+            for future in concurrent.futures.as_completed(futures):
+                i = futures[future]
+                transforms[i] = future.result()
+                pbar.update(1)
+    return transforms
+
+
 def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False):
     # Create output directory if needed
     output_dir = os.path.dirname(output_prefix)
