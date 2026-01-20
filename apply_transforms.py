@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import os
 import csv
 import concurrent.futures
 from tqdm import tqdm
@@ -73,7 +73,7 @@ def resample_volume(volume, reference, transform, interpolation=sitk.sitkBSpline
     return resampled
 
 
-def framewise_resample_volume(input_image, reference_image, transforms, interpolation=sitk.sitkBSpline5, clip_negative=True, extrapolator=True):
+def framewise_resample_volume(input_image, reference_image, transforms, interpolation=sitk.sitkBSpline5, clip_negative=True, extrapolator=True, max_workers=os.cpu_count()):
     num_volumes = input_image.GetSize()[3]
     # Extract 3D volumes from input to process in parallel
     input_volumes = []
@@ -87,7 +87,7 @@ def framewise_resample_volume(input_image, reference_image, transforms, interpol
     resampled_volumes = [None] * num_volumes
     
     # Parallel processing
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
         with tqdm(total=num_volumes) as pbar:
             futures = {}
             for i in range(num_volumes):

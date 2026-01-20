@@ -419,7 +419,7 @@ def resample_slice_pair(
     return output_image
 
 
-def framewise_register_pair(moving_img, ref_img, level=1,interpolation=sitk.sitkBSpline5):
+def framewise_register_pair(moving_img, ref_img, level=1,interpolation=sitk.sitkBSpline5, max_workers=os.cpu_count()):
     # the input can be either a nifti file or an SITK image
     if isinstance(moving_img, sitk.Image):
         moving_img = moving_img
@@ -456,7 +456,7 @@ def framewise_register_pair(moving_img, ref_img, level=1,interpolation=sitk.sitk
 
     transforms = [None] * num_volumes
     # Parallel Registration
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
         with tqdm(total=num_volumes - 1) as pbar:
             futures = {}
             for i in range(0, num_volumes):
