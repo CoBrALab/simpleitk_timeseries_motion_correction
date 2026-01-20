@@ -199,66 +199,33 @@ def register_pair(
                 0.424628,
             ]
         )
-    elif level==2:
-        registration_method.SetOptimizerAsConjugateGradientLineSearch(
-            learningRate=1.0,
-            numberOfIterations=20,
-            convergenceMinimumValue=1e-6,
-            convergenceWindowSize=10,
-            estimateLearningRate=registration_method.EachIteration,
-            lineSearchUpperLimit=5.0,
-            maximumStepSizeInPhysicalUnits=fixed.GetSpacing()[0],
-        )
-        registration_method.SetShrinkFactorsPerLevel(shrinkFactors=[8, 4, 4, 4])
-        registration_method.SetSmoothingSigmasPerLevel(
-            smoothingSigmas=[
-                0.424628 * 8,
-                0.424628 * 4,
-                0.424628 * 2,
-                0.424628,
-            ]
-        )
-    elif level==1:
-        registration_method.SetOptimizerAsConjugateGradientLineSearch(
-            learningRate=1.0,
-            numberOfIterations=5,
-            convergenceMinimumValue=1e-6,
-            convergenceWindowSize=10,
-            estimateLearningRate=registration_method.EachIteration,
-            lineSearchUpperLimit=5.0,
-            maximumStepSizeInPhysicalUnits=fixed.GetSpacing()[0],
-        )
-        registration_method.SetShrinkFactorsPerLevel(shrinkFactors=[8, 4, 4, 4])
-        registration_method.SetSmoothingSigmasPerLevel(
-            smoothingSigmas=[
-                0.424628 * 8,
-                0.424628 * 4,
-                0.424628 * 2,
-                0.424628,
-            ]
-        )
-    elif level==0:
-        registration_method.SetOptimizerAsConjugateGradientLineSearch(
-            learningRate=1.0,
-            numberOfIterations=1,
-            convergenceMinimumValue=1e-6,
-            convergenceWindowSize=10,
-            estimateLearningRate=registration_method.EachIteration,
-            lineSearchUpperLimit=5.0,
-            maximumStepSizeInPhysicalUnits=fixed.GetSpacing()[0],
-        )
-        registration_method.SetShrinkFactorsPerLevel(shrinkFactors=[8, 4, 4, 4])
-        registration_method.SetSmoothingSigmasPerLevel(
-            smoothingSigmas=[
-                0.424628 * 8,
-                0.424628 * 4,
-                0.424628 * 2,
-                0.424628,
-            ]
-        )
     else:
-        raise ValueError(f"The input {level} is invalid for level parameter.")
-
+        if level==2:
+            num_iter = 20
+        elif level==1:
+            num_iter = 5
+        elif level==0:
+            num_iter = 1
+        else:
+            raise ValueError(f"The input {level} is invalid for level parameter.")
+        registration_method.SetOptimizerAsConjugateGradientLineSearch(
+            learningRate=1.0,
+            numberOfIterations=num_iter,
+            convergenceMinimumValue=1e-6,
+            convergenceWindowSize=10,
+            estimateLearningRate=registration_method.EachIteration,
+            lineSearchUpperLimit=5.0,
+            maximumStepSizeInPhysicalUnits=fixed.GetSpacing()[0],
+        )
+        registration_method.SetShrinkFactorsPerLevel(shrinkFactors=[8, 4, 4, 4])
+        registration_method.SetSmoothingSigmasPerLevel(
+            smoothingSigmas=[
+                0.424628 * 8,
+                0.424628 * 4,
+                0.424628 * 2,
+                0.424628,
+            ]
+        )
 
     registration_method.SetOptimizerScalesFromIndexShift()
 
