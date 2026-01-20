@@ -85,7 +85,7 @@ def isotropic_upsample_and_pad(image, interpolation=sitk.sitkBSpline5, clip_nega
     """
     original_spacing = image.GetSpacing()
     min_spacing = min(original_spacing)
-    if original_spacing==image.GetDimension()*(min_spacing,):
+    if np.allclose(original_spacing,image.GetDimension()*(min_spacing,)):
         # the image is already isotropic
         resampled_image = image
     else:
