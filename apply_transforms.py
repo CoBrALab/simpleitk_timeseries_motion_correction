@@ -4,7 +4,6 @@ import csv
 import concurrent.futures
 from tqdm import tqdm
 import SimpleITK as sitk
-import os
 
 
 def read_transforms_from_csv(csv_file):
@@ -119,10 +118,6 @@ def framewise_resample_volume(input_image, reference_image, transforms, interpol
 
 
 def main(args):
-    # Create output directory if it doesn't exist
-    output_dir = os.path.dirname(args.output_file)
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
 
     print(f"Reading input: {args.input_file}")
     input_image = sitk.ReadImage(args.input_file)
