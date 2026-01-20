@@ -6,7 +6,7 @@ import numpy as np
 import concurrent.futures
 from tqdm import tqdm
 import csv
-from apply_transforms import resample_image
+from apply_transforms import resample_volume
 
 def write_transforms_to_csv(transforms, output_file):
     """
@@ -583,7 +583,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                     resampled[i] = sitk.Cast(volumes[i], sitk.sitkFloat32)
                     continue
                 future = executor.submit(
-                    resample_image, volumes[mid_idx], volumes[i], transforms[i]
+                    resample_volume, volumes[i], volumes[mid_idx], transforms[i]
                 )
                 futures[future] = i
             # Collect results
@@ -618,8 +618,8 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                 for i in range(0, num_volumes):
                     future = executor.submit(
                         register_slice_pair,
-                        fixed=resample_image(
-                            volumes[i], mean_image, transforms[i].GetInverse()
+                        fixed=resample_volume(
+                            mean_image, volumes[i], transforms[i].GetInverse()
                         ),
                         moving=volumes[i],
                     )
@@ -661,9 +661,9 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                         )
                         continue
                     future = executor.submit(
-                        resample_image,
-                        volumes[mid_idx],
+                        resample_volume,
                         slicewise_resampled[i],
+                        volumes[mid_idx],
                         transforms[i],
                     )
                     futures[future] = i
@@ -712,11 +712,11 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                     futures = {}
                     for i in range(0, num_volumes):
                         future = executor.submit(
-                            resample_image,
+                            resample_volume,
+                            volume=slicewise_resampled[i],
                             reference=mean_image,
-                            moving=slicewise_resampled[i],
                             transform=transforms[i],
-                            interp=sitk.sitkBSpline5,
+                            interpolation=sitk.sitkBSpline5,
                         )
                         futures[future] = i
                     # Collect results
@@ -743,8 +743,8 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                     for i in range(0, num_volumes):
                         future = executor.submit(
                             register_slice_pair,
-                            fixed=resample_image(
-                                volumes[i], mean_image, transforms[i].GetInverse()
+                            fixed=resample_volume(
+                                mean_image, volumes[i], transforms[i].GetInverse()
                             ),
                             moving=volumes[i],
                         )
@@ -781,9 +781,9 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                     futures = {}
                     for i in range(0, num_volumes):
                         future = executor.submit(
-                            resample_image,
-                            mean_image,
+                            resample_volume,
                             slicewise_resampled[i],
+                            mean_image,
                             transforms[i],
                         )
                         futures[future] = i
@@ -840,11 +840,11 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
             futures = {}
             for i in range(0, num_volumes):
                 future = executor.submit(
-                    resample_image,
+                    resample_volume,
+                    volume=slicewise_resampled[i],
                     reference=mean_image,
-                    moving=slicewise_resampled[i],
                     transform=transforms[i],
-                    interp=sitk.sitkBSpline5,
+                    interpolation=sitk.sitkBSpline5,
                 )
                 futures[future] = i
             # Collect results
