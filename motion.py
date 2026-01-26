@@ -436,10 +436,13 @@ def framewise_register_pair(moving_img, ref_img, level=1,interpolation=sitk.sitk
     else:
         raise ValueError(f'{ref_img} is neither a file nor an SITK image.')
 
-    fixed_upsample = isotropic_upsample_and_pad(ref_img, interpolation)
+    if not ref_img.GetDimension()==3:
+        raise ValueError(f"ref_img input must be 3D, got {ref_img.GetDimension()}D instead")
 
     if not moving_img.GetDimension()==4:
         raise ValueError(f"moving_img input must be 4D, got {moving_img.GetDimension()}D instead")
+
+    fixed_upsample = isotropic_upsample_and_pad(ref_img, interpolation)
 
     size_4d = moving_img.GetSize()
     num_volumes = size_4d[3]
