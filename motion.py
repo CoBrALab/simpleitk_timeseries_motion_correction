@@ -460,7 +460,7 @@ def framewise_register_pair(moving_img, ref_img, level=1,interpolation=sitk.sitk
     transforms = [None] * num_volumes
     # Parallel Registration
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-        with tqdm(total=num_volumes - 1) as pbar:
+        with tqdm(total=num_volumes) as pbar:
             futures = {}
             for i in range(0, num_volumes):
                 future = executor.submit(
