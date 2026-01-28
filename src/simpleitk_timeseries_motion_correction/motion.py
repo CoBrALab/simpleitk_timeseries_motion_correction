@@ -353,8 +353,8 @@ def register_slice_pair(
                 sitk.Cast(fixed_slice, sitk.sitkFloat32),
                 sitk.Cast(moving_slice, sitk.sitkFloat32),
             ).GetBackTransform()
-        except:
-            print("Slicewise registration exception, returning identity transform")
+        except Exception as e:
+            print(f"Slicewise registration exception: {e}, returning identity transform")
             final_transform = sitk.Euler2DTransform()
         slice_transforms.append(final_transform)
 
