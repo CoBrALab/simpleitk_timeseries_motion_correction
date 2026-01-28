@@ -6,7 +6,8 @@ import numpy as np
 import concurrent.futures
 from tqdm import tqdm
 import csv
-from apply_transforms import resample_volume
+from .apply_transforms import resample_volume
+
 
 def write_transforms_to_csv(transforms, output_file):
     """
@@ -71,7 +72,9 @@ def make_mask(image):
     return mask
 
 
-def isotropic_upsample_and_pad(image, interpolation=sitk.sitkBSpline5, clip_negative=True):
+def isotropic_upsample_and_pad(
+    image, interpolation=sitk.sitkBSpline5, clip_negative=True
+):
     """
     Resample the image to isotropic spacing using the smallest existing spacing.
 
@@ -85,7 +88,7 @@ def isotropic_upsample_and_pad(image, interpolation=sitk.sitkBSpline5, clip_nega
     """
     original_spacing = image.GetSpacing()
     min_spacing = min(original_spacing)
-    if np.allclose(original_spacing,image.GetDimension()*(min_spacing,)):
+    if np.allclose(original_spacing, image.GetDimension() * (min_spacing,)):
         # the image is already isotropic
         resampled_image = image
     else:
@@ -109,7 +112,9 @@ def isotropic_upsample_and_pad(image, interpolation=sitk.sitkBSpline5, clip_nega
             image.GetPixelID(),
         )
         if clip_negative:
-            resampled_image = resampled_image*sitk.Cast(resampled_image>0, resampled_image.GetPixelID())    
+            resampled_image = resampled_image * sitk.Cast(
+                resampled_image > 0, resampled_image.GetPixelID()
+            )
     # Duplicate the outer slice of the image twice to pad it.
     dim = image.GetDimension()
     resampled_image = sitk.MirrorPad(
@@ -166,7 +171,7 @@ def register_pair(
     registration_method.MetricUseFixedImageGradientFilterOn()
     registration_method.MetricUseMovingImageGradientFilterOn()
 
-    if level==4:
+    if level == 4:
         registration_method.SetOptimizerAsConjugateGradientLineSearch(
             learningRate=0.1,
             numberOfIterations=100,
@@ -179,7 +184,7 @@ def register_pair(
         )
         registration_method.SetShrinkFactorsPerLevel(shrinkFactors=[2, 2])
         registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[0.424628, 0])
-    elif level==3:
+    elif level == 3:
         registration_method.SetOptimizerAsConjugateGradientLineSearch(
             learningRate=0.1,
             numberOfIterations=100,
@@ -188,7 +193,7 @@ def register_pair(
             estimateLearningRate=registration_method.Once,
             lineSearchUpperLimit=2.0,
             lineSearchEpsilon=0.1,
-            maximumStepSizeInPhysicalUnits=fixed.GetSpacing()[0]*4,
+            maximumStepSizeInPhysicalUnits=fixed.GetSpacing()[0] * 4,
         )
         registration_method.SetShrinkFactorsPerLevel(shrinkFactors=[8, 4, 4, 4])
         registration_method.SetSmoothingSigmasPerLevel(
@@ -200,11 +205,11 @@ def register_pair(
             ]
         )
     else:
-        if level==2:
+        if level == 2:
             num_iter = 20
-        elif level==1:
+        elif level == 1:
             num_iter = 5
-        elif level==0:
+        elif level == 0:
             num_iter = 1
         else:
             raise ValueError(f"The input {level} is invalid for level parameter.")
@@ -260,7 +265,9 @@ def register_pair(
     ).GetBackTransform()
 
 
-def register_slice_pair(fixed, moving, slice_direction=2, interpolation=sitk.sitkBSpline5):
+def register_slice_pair(
+    fixed, moving, slice_direction=2, interpolation=sitk.sitkBSpline5
+):
     """
     Registers each slice of the moving image to the corresponding slice of the fixed image.
     Assumes moving volume has already been registered to the fixed using register_pair
@@ -346,8 +353,8 @@ def register_slice_pair(fixed, moving, slice_direction=2, interpolation=sitk.sit
                 sitk.Cast(fixed_slice, sitk.sitkFloat32),
                 sitk.Cast(moving_slice, sitk.sitkFloat32),
             ).GetBackTransform()
-        except:
-            print("Slicewise registration exception, returning identity transform")
+        except Exception as e:
+            print(f"Slicewise registration exception: {e}, returning identity transform")
             final_transform = sitk.Euler2DTransform()
         slice_transforms.append(final_transform)
 
@@ -355,7 +362,13 @@ def register_slice_pair(fixed, moving, slice_direction=2, interpolation=sitk.sit
 
 
 def resample_slice_pair(
-    reference, moving, transforms, slice_direction=2, interp=sitk.sitkBSpline5, clip_negative=True, extrapolator=True
+    reference,
+    moving,
+    transforms,
+    slice_direction=2,
+    interp=sitk.sitkBSpline5,
+    clip_negative=True,
+    extrapolator=True,
 ):
     """
     Resamples the moving image to the reference image slice-by-slice using the provided transforms.
@@ -404,11 +417,13 @@ def resample_slice_pair(
             interp,
             0.0,
             reference.GetPixelID(),
-            useNearestNeighborExtrapolator=extrapolator
+            useNearestNeighborExtrapolator=extrapolator,
         )
         if clip_negative:
             # set all negative values to 0
-            resampled_slice = resampled_slice*sitk.Cast(resampled_slice>0, resampled_slice.GetPixelID())    
+            resampled_slice = resampled_slice * sitk.Cast(
+                resampled_slice > 0, resampled_slice.GetPixelID()
+            )
         if slice_direction == 2:
             output_image[:, :, z] = resampled_slice
         elif slice_direction == 1:
@@ -419,14 +434,20 @@ def resample_slice_pair(
     return output_image
 
 
-def framewise_register_pair(moving_img, ref_img, level=1,interpolation=sitk.sitkBSpline5, max_workers=os.cpu_count()):
+def framewise_register_pair(
+    moving_img,
+    ref_img,
+    level=1,
+    interpolation=sitk.sitkBSpline5,
+    max_workers=os.cpu_count(),
+):
     # the input can be either a nifti file or an SITK image
     if isinstance(moving_img, sitk.Image):
         moving_img = moving_img
     elif os.path.isfile(moving_img):
         moving_img = sitk.ReadImage(moving_img, sitk.sitkFloat32)
     else:
-        raise ValueError(f'{moving_img} is neither a file nor an SITK image.')
+        raise ValueError(f"{moving_img} is neither a file nor an SITK image.")
 
     # the input can be either a nifti file or an SITK image
     if isinstance(ref_img, sitk.Image):
@@ -434,13 +455,17 @@ def framewise_register_pair(moving_img, ref_img, level=1,interpolation=sitk.sitk
     elif os.path.isfile(ref_img):
         ref_img = sitk.ReadImage(ref_img, sitk.sitkFloat32)
     else:
-        raise ValueError(f'{ref_img} is neither a file nor an SITK image.')
+        raise ValueError(f"{ref_img} is neither a file nor an SITK image.")
 
-    if not ref_img.GetDimension()==3:
-        raise ValueError(f"ref_img input must be 3D, got {ref_img.GetDimension()}D instead")
+    if not ref_img.GetDimension() == 3:
+        raise ValueError(
+            f"ref_img input must be 3D, got {ref_img.GetDimension()}D instead"
+        )
 
-    if not moving_img.GetDimension()==4:
-        raise ValueError(f"moving_img input must be 4D, got {moving_img.GetDimension()}D instead")
+    if not moving_img.GetDimension() == 4:
+        raise ValueError(
+            f"moving_img input must be 4D, got {moving_img.GetDimension()}D instead"
+        )
 
     fixed_upsample = isotropic_upsample_and_pad(ref_img, interpolation)
 
