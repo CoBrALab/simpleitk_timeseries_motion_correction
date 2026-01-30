@@ -7,14 +7,14 @@ name = "simpleitk-timeseries-motion-correction"
 version = "0.1.0"
 description = "fMRI motion correction using SimpleITK"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 dependencies = [
     "SimpleITK>=2.5.0",
-    "numpy>=2.0.0",
+    "numpy>=1.26.4",
     "tqdm>=4.67.0",
     "imageio>=2.37.0",
-    "Pillow>=12.0.0",
-    "matplotlib>=3.10.0",
-    "scipy>=1.17.0"
+    "Pillow>=10.1.0",
+    "matplotlib>=3.3.4",
+    "scipy>=1.13.1"
 ]
 

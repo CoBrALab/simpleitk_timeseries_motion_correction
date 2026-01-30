@@ -102,7 +102,7 @@ def framewise_resample_volume(
     resampled_volumes = [None] * num_volumes
 
     # Parallel processing
-    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         with tqdm(total=num_volumes) as pbar:
             futures = {}
             for i in range(num_volumes):

@@ -484,7 +484,7 @@ def framewise_register_pair(
 
     transforms = [None] * num_volumes
     # Parallel Registration
-    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         with tqdm(total=num_volumes) as pbar:
             futures = {}
             for i in range(0, num_volumes):
@@ -548,7 +548,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
 
     print(f"Registering time slices to volume {mid_idx + 1}")
     # Parallel Registration
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor() as executor:
         with tqdm(total=num_volumes - 1) as pbar:
             futures = {}
             for i in range(0, num_volumes):
@@ -572,7 +572,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
     print("Resampling time slices to middle volume")
     # Parallel Resampling
     resampled = [None] * num_volumes
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor() as executor:
         with tqdm(total=num_volumes - 1) as pbar:
             futures = {}
             for i in range(0, num_volumes):
@@ -609,7 +609,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
         print(
             "Back projecting mean image to individual volumes and performing slice-by-slice registration"
         )
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
             with tqdm(total=num_volumes) as pbar:
                 futures = {}
                 for i in range(0, num_volumes):
@@ -628,7 +628,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                     pbar.update(1)
 
         print("Resampling 2D slices")
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
             with tqdm(total=num_volumes) as pbar:
                 futures = {}
                 for i in range(0, num_volumes):
@@ -648,7 +648,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
         # Parallel Resampling
         print("Resampling corrected 3D volumes to middle volume")
         resampled = [None] * num_volumes
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
             with tqdm(total=num_volumes - 1) as pbar:
                 futures = {}
                 for i in range(0, num_volumes):
@@ -683,7 +683,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
             print("Performing second-pass slice-by-slice registration")
             fixed_upsample = isotropic_upsample_and_pad(mean_image, sitk.sitkBSpline5)
             print("Registering volumes to mean image")
-            with concurrent.futures.ProcessPoolExecutor() as executor:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
                 with tqdm(total=num_volumes) as pbar:
                     futures = {}
                     for i in range(0, num_volumes):
@@ -704,7 +704,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
 
             print("Resampling volumes to mean image")
             resampled = [None] * num_volumes
-            with concurrent.futures.ProcessPoolExecutor() as executor:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
                 with tqdm(total=num_volumes) as pbar:
                     futures = {}
                     for i in range(0, num_volumes):
@@ -734,7 +734,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
             print(
                 "Back projecting mean image to individual volumes and performing slice-by-slice registration"
             )
-            with concurrent.futures.ProcessPoolExecutor() as executor:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
                 with tqdm(total=num_volumes) as pbar:
                     futures = {}
                     for i in range(0, num_volumes):
@@ -753,7 +753,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                         pbar.update(1)
 
             print("Resampling 2D slices")
-            with concurrent.futures.ProcessPoolExecutor() as executor:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
                 with tqdm(total=num_volumes) as pbar:
                     futures = {}
                     for i in range(0, num_volumes):
@@ -773,7 +773,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
             # Parallel Resampling
             print("Resampling corrected 3D volumes to mean volume")
             resampled = [None] * num_volumes
-            with concurrent.futures.ProcessPoolExecutor() as executor:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
                 with tqdm(total=num_volumes) as pbar:
                     futures = {}
                     for i in range(0, num_volumes):
@@ -809,7 +809,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
     # fixed_mask = make_mask(fixed_upsample)
 
     print("Registering volumes to mean image")
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor() as executor:
         with tqdm(total=num_volumes) as pbar:
             futures = {}
             for i in range(0, num_volumes):
@@ -832,7 +832,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
 
     print("Resampling volumes to mean image")
     resampled = [None] * num_volumes
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor() as executor:
         with tqdm(total=num_volumes) as pbar:
             futures = {}
             for i in range(0, num_volumes):
