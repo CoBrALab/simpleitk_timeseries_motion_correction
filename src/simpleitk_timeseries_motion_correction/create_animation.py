@@ -158,9 +158,20 @@ def process_frame(
     return combined
 
 
-def main(input_file, output_file, additional_input_files=None, scale=2.0, fps=10):
-    print(f"Loading {input_file}...")
-    img = sitk.ReadImage(input_file)
+def main(input_img, output_file, additional_input_imgs=None, labels=None, scale=2.0, fps=10):
+
+    # prepare list of axis labels
+    if not labels is None:
+        # read file name if the labels list are files
+        labels = [os.path.basename(label) if os.path.isfile(label) else str(label) for label in labels]
+
+    # the input can be either a nifti file or an SITK image
+    if isinstance(input_img, sitk.Image):
+        img = input_img
+    elif os.path.isfile(input_img):
+        print(f"Loading {input_img}...")
+        img = sitk.ReadImage(input_img)
+
 
     # Get array (t, z, y, x) or (z, y, x)
     arr = sitk.GetArrayFromImage(img)
@@ -177,23 +188,24 @@ def main(input_file, output_file, additional_input_files=None, scale=2.0, fps=10
     print(f"Data shape: {arr.shape}")
 
     additional_arrs = []
-    if additional_input_files:
-        for f in additional_input_files:
-            print(f"Loading additional input {f}...")
-            img_add = sitk.ReadImage(f)
+    if additional_input_imgs:
+        for img_add in additional_input_imgs:
+            # the input can be either a nifti file or an SITK image
+            if isinstance(img_add, sitk.Image):
+                img_add = img_add
+            elif os.path.isfile(img_add):
+                print(f"Loading second input {img_add}...")
+                img_add = sitk.ReadImage(img_add)
+
             arr_add = sitk.GetArrayFromImage(img_add)
             if arr_add.ndim == 3:
                 arr_add = arr_add[np.newaxis, ...]
             print(f"Additional Data shape: {arr_add.shape}")
             if arr_add.shape != arr.shape:
                 print(
-                    f"WARNING: Shape of {f} does not match exactly. Proceeding with assumption that dimensions are compatible for slicing."
+                    f"WARNING: Shape of {img_add} does not match exactly. Proceeding with assumption that dimensions are compatible for slicing."
                 )
             additional_arrs.append(arr_add)
-
-    labels = [os.path.basename(input_file)]
-    if additional_input_files:
-        labels.extend([os.path.basename(f) for f in additional_input_files])
 
     # Calculate Center of Mass on the first frame
     print("Calculating center of mass...")
@@ -265,6 +277,11 @@ if __name__ == "__main__":
         help="Optional additional input NIfTI file(s) (same dimensions) to display as additional rows",
     )
     parser.add_argument(
+        "--labels",
+        action="append",
+        help="Can list a series of axis titles lining up input images, starting with the 'input' file and then the --additional-row files provided. If a list of Nifti files is provided, the filename will be used as axis label.",
+    )
+    parser.add_argument(
         "--scale",
         type=float,
         default=2.0,
@@ -274,4 +291,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main(args.input, args.output, args.additional_row, args.scale, args.fps)
+    main(args.input, args.output, args.additional_row, args.labels, args.scale, args.fps)
