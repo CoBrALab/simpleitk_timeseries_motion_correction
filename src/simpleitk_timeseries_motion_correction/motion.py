@@ -153,6 +153,7 @@ def voxelwise_std(image_list):
 def register_pair(
     fixed,
     moving,
+    com_mask=None,
     initial_transform=None,
     fixed_mask=None,
     level=3,
@@ -235,12 +236,13 @@ def register_pair(
     registration_method.SetOptimizerScalesFromIndexShift()
 
     if not initial_transform:
-        # A good estimate of the center-of-rotation is essential here
-        # we don't want to be biased by activation or ventricular signal
-        # so we use our otsu binary mask to find the COM
-        binary_mask = make_mask(fixed)
+        if com_mask is None:
+            # A good estimate of the center-of-rotation is essential here
+            # we don't want to be biased by activation or ventricular signal
+            # so we use our otsu binary mask to find the COM
+            com_mask = make_mask(fixed)
         com_initializer = sitk.CenteredTransformInitializer(
-            sitk.Cast(binary_mask, sitk.sitkFloat32),
+            sitk.Cast(com_mask, sitk.sitkFloat32),
             sitk.Cast(moving, sitk.sitkFloat32),
             sitk.Euler3DTransform(),
             sitk.CenteredTransformInitializerFilter.MOMENTS,
@@ -266,7 +268,11 @@ def register_pair(
 
 
 def register_slice_pair(
-    fixed, moving, slice_direction=2, interpolation=sitk.sitkBSpline5
+    fixed, 
+    moving, 
+    com_mask=None,
+    slice_direction=2, 
+    interpolation=sitk.sitkBSpline5,
 ):
     """
     Registers each slice of the moving image to the corresponding slice of the fixed image.
@@ -331,12 +337,13 @@ def register_slice_pair(
             ]
         )
 
-        # A good estimate of the center-of-rotation is essential here
-        # we don't want to be biased by activation or ventricular signal
-        # so we use our otsu binary mask to find the COM
-        binary_mask = make_mask(fixed_slice)
+        if com_mask is None:
+            # A good estimate of the center-of-rotation is essential here
+            # we don't want to be biased by activation or ventricular signal
+            # so we use our otsu binary mask to find the COM
+            com_mask = make_mask(fixed_slice)
         com_initializer = sitk.CenteredTransformInitializer(
-            sitk.Cast(binary_mask, sitk.sitkFloat32),
+            sitk.Cast(com_mask, sitk.sitkFloat32),
             sitk.Cast(moving_slice, sitk.sitkFloat32),
             sitk.Euler2DTransform(),
             sitk.CenteredTransformInitializerFilter.MOMENTS,
@@ -482,6 +489,7 @@ def framewise_register_pair(
 
     del extractor
 
+    com_mask = make_mask(fixed_upsample)
     transforms = [None] * num_volumes
     # Parallel Registration
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -492,6 +500,7 @@ def framewise_register_pair(
                     register_pair,
                     fixed=fixed_upsample,
                     moving=volumes[i],
+                    com_mask=com_mask,
                     fixed_mask=None,
                     level=level,
                 )
@@ -546,6 +555,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
 
     round = 0
 
+    com_mask = make_mask(fixed_upsample)
     print(f"Registering time slices to volume {mid_idx + 1}")
     # Parallel Registration
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -558,6 +568,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                     register_pair,
                     fixed=fixed_upsample,
                     moving=volumes[i],
+                    com_mask=com_mask,
                     fixed_mask=None,
                 )
                 futures[future] = i
@@ -683,6 +694,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
             print("Performing second-pass slice-by-slice registration")
             fixed_upsample = isotropic_upsample_and_pad(mean_image, sitk.sitkBSpline5)
             print("Registering volumes to mean image")
+            com_mask = make_mask(fixed_upsample)
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 with tqdm(total=num_volumes) as pbar:
                     futures = {}
@@ -691,6 +703,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                             register_pair,
                             fixed=fixed_upsample,
                             moving=slicewise_resampled[i],
+                            com_mask=com_mask,
                             initial_transform=transforms[i],
                         )
                         futures[future] = i
@@ -809,6 +822,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
     # fixed_mask = make_mask(fixed_upsample)
 
     print("Registering volumes to mean image")
+    com_mask = make_mask(fixed_upsample)
     with concurrent.futures.ThreadPoolExecutor() as executor:
         with tqdm(total=num_volumes) as pbar:
             futures = {}
@@ -818,6 +832,7 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                     fixed=fixed_upsample,
                     moving=slicewise_resampled[i],
                     initial_transform=transforms[i],
+                    com_mask=com_mask,
                     fixed_mask=None,
                     level=4,
                 )
@@ -881,3 +896,4 @@ if __name__ == "__main__":
 
     print(f"Processing {args.input}")
     main(args.input, args.output_prefix, args.slice_moco, args.two_pass_slice_moco)
+    
