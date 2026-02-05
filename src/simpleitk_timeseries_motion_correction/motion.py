@@ -7,7 +7,7 @@ import concurrent.futures
 from tqdm import tqdm
 import csv
 from .apply_transforms import resample_volume
-
+from .make_syn_pyramid import make_syn_pyramid
 
 def write_transforms_to_csv(transforms, output_file):
     """
@@ -151,6 +151,45 @@ def voxelwise_std(image_list):
     std_image = sitk.GetImageFromArray(std_array)
     std_image.CopyInformation(image_list[0])
     return std_image
+
+
+def estimate_shrinks_sigmas(img, level=2):
+    min_length = min(img.GetSize()[:3])
+    min_spacing = min(img.GetSpacing()[:3])
+    
+    shrinks_l_l, smooths_l_l, iterations_l_l = make_syn_pyramid(
+            min_spacing=min_spacing,
+            min_length=min_length,
+            final_iterations=50,
+            rough=False,
+            close=False,
+        )
+    shrinks_l_l.pop(-1) # taking out the fine last iteration
+    smooths_l_l.pop(-1) # taking out the fine last iteration
+
+    if level==1: # level1: only 1st octave
+        shrinks = shrinks_l_l[0][-2:]
+        smooths = smooths_l_l[0][-2:]
+
+    elif level==2: # level2: only 2nd octave
+        if len(shrinks_l_l)>1: # if there was at least 2 octaves, take 2nd octave
+            shrinks = shrinks_l_l[1][-2:]
+            smooths = smooths_l_l[1][-2:]
+        else:
+            shrinks = shrinks_l_l[0][-2:]
+            smooths = smooths_l_l[0][-2:]
+        
+    elif level>=3: # level3: combined first 3 octaves
+        shrinks = []
+        for shrinks_l in shrinks_l_l[:3]:
+            shrinks += shrinks_l[-2:]
+        smooths = []
+        for smooths_l in smooths_l_l[:3]:
+            smooths += smooths_l[-2:]
+        if level>3: # level4: append a 'fine' step at max resolution
+            shrinks += [1]
+            smooths += [0.0]
+    return shrinks,smooths
 
 
 def register_pair(
