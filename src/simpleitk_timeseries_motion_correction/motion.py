@@ -236,7 +236,7 @@ def register_pair(
     registration_method.SetOptimizerScalesFromIndexShift()
 
     if not initial_transform:
-        if com_mask is None:
+        if not com_mask:
             # A good estimate of the center-of-rotation is essential here
             # we don't want to be biased by activation or ventricular signal
             # so we use our otsu binary mask to find the COM
@@ -337,7 +337,7 @@ def register_slice_pair(
             ]
         )
 
-        if com_mask is None:
+        if not com_mask:
             # A good estimate of the center-of-rotation is essential here
             # we don't want to be biased by activation or ventricular signal
             # so we use our otsu binary mask to find the COM
