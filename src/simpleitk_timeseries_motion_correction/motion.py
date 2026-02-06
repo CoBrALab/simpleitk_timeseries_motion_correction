@@ -7,7 +7,7 @@ import concurrent.futures
 from tqdm import tqdm
 import csv
 from .apply_transforms import resample_volume
-
+from .make_pyramid import make_pyramid
 
 def write_transforms_to_csv(transforms, output_file):
     """
@@ -153,13 +153,54 @@ def voxelwise_std(image_list):
     return std_image
 
 
+def estimate_shrinks_sigmas(img, level=2):
+    min_length = min(img.GetSize()[:3])
+    min_spacing = min(img.GetSpacing()[:3])
+    
+    shrinks_l_l, smooths_l_l, iterations_l_l = make_pyramid(
+            min_spacing=min_spacing,
+            min_length=min_length,
+            final_iterations=50,
+            rough=False,
+            close=False,
+        )
+    shrinks_l_l.pop(-1) # taking out the fine last iteration
+    smooths_l_l.pop(-1) # taking out the fine last iteration
+
+    if level==1: # level1: only 1st octave
+        shrinks = shrinks_l_l[0][-2:]
+        smooths = smooths_l_l[0][-2:]
+
+    elif level==2: # level2: only 2nd octave
+        if len(shrinks_l_l)>1: # if there was at least 2 octaves, take 2nd octave
+            shrinks = shrinks_l_l[1][-2:]
+            smooths = smooths_l_l[1][-2:]
+        else:
+            shrinks = shrinks_l_l[0][-2:]
+            smooths = smooths_l_l[0][-2:]
+        
+    elif level>=3: # level3: combined first 3 octaves
+        shrinks = []
+        for shrinks_l in shrinks_l_l[:3]:
+            shrinks += shrinks_l[-2:]
+        smooths = []
+        for smooths_l in smooths_l_l[:3]:
+            smooths += smooths_l[-2:]
+        if level>3: # level4: append a 'fine' step at max resolution
+            shrinks += [1]
+            smooths += [0.0]
+    return shrinks,smooths
+
+
 def register_pair(
     fixed,
     moving,
+    shrinks,
+    sigmas,
+    num_iter=5,
     com_mask=None,
     initial_transform=None,
     fixed_mask=None,
-    level=3,
 ):
     """Register moving image to fixed image using Euler3DTransform."""
     registration_method = sitk.ImageRegistrationMethod()
@@ -175,71 +216,23 @@ def register_pair(
     registration_method.MetricUseFixedImageGradientFilterOn()
     registration_method.MetricUseMovingImageGradientFilterOn()
 
-    if level == 4:
-        registration_method.SetOptimizerAsConjugateGradientLineSearch(
-            learningRate=0.1,
-            numberOfIterations=100,
-            convergenceMinimumValue=1e-6,
-            convergenceWindowSize=10,
-            estimateLearningRate=registration_method.Once,
-            lineSearchUpperLimit=2.0,
-            lineSearchEpsilon=0.1,
-            maximumStepSizeInPhysicalUnits=fixed.GetSpacing()[0],
-        )
-        registration_method.SetShrinkFactorsPerLevel(shrinkFactors=[2, 2])
-        registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[0.424628, 0])
-    elif level == 3:
-        registration_method.SetOptimizerAsConjugateGradientLineSearch(
-            learningRate=0.1,
-            numberOfIterations=100,
-            convergenceMinimumValue=1e-6,
-            convergenceWindowSize=10,
-            estimateLearningRate=registration_method.Once,
-            lineSearchUpperLimit=2.0,
-            lineSearchEpsilon=0.1,
-            maximumStepSizeInPhysicalUnits=fixed.GetSpacing()[0] * 4,
-        )
-        registration_method.SetShrinkFactorsPerLevel(shrinkFactors=[8, 4, 4, 4])
-        registration_method.SetSmoothingSigmasPerLevel(
-            smoothingSigmas=[
-                0.424628 * 8,
-                0.424628 * 4,
-                0.424628 * 2,
-                0.424628,
-            ]
-        )
-    else:
-        if level == 2:
-            num_iter = 20
-        elif level == 1:
-            num_iter = 5
-        elif level == 0:
-            num_iter = 1
-        else:
-            raise ValueError(f"The input {level} is invalid for level parameter.")
-        registration_method.SetOptimizerAsConjugateGradientLineSearch(
-            learningRate=1.0,
-            numberOfIterations=num_iter,
-            convergenceMinimumValue=1e-6,
-            convergenceWindowSize=10,
-            estimateLearningRate=registration_method.EachIteration,
-            lineSearchUpperLimit=5.0,
-            maximumStepSizeInPhysicalUnits=fixed.GetSpacing()[0],
-        )
-        registration_method.SetShrinkFactorsPerLevel(shrinkFactors=[8, 4, 4, 4])
-        registration_method.SetSmoothingSigmasPerLevel(
-            smoothingSigmas=[
-                0.424628 * 8,
-                0.424628 * 4,
-                0.424628 * 2,
-                0.424628,
-            ]
-        )
+    registration_method.SetOptimizerAsConjugateGradientLineSearch(
+        learningRate=1.0,
+        numberOfIterations=num_iter,
+        convergenceMinimumValue=1e-6,
+        convergenceWindowSize=10,
+        estimateLearningRate=registration_method.EachIteration,
+        lineSearchUpperLimit=5.0,
+        maximumStepSizeInPhysicalUnits=fixed.GetSpacing()[0],
+    )
 
+    registration_method.SetShrinkFactorsPerLevel(shrinkFactors=shrinks)
+    registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=sigmas)
+    
     registration_method.SetOptimizerScalesFromIndexShift()
 
     if not initial_transform:
-        if not com_mask:
+        if com_mask is None:
             # A good estimate of the center-of-rotation is essential here
             # we don't want to be biased by activation or ventricular signal
             # so we use our otsu binary mask to find the COM
@@ -252,16 +245,12 @@ def register_pair(
         )
         initial_transform = sitk.Euler3DTransform()
         initial_transform.SetCenter(com_initializer.GetCenter())
-
+    
     # Initial transform
     registration_method.SetInitialTransform(initial_transform, inPlace=False)
 
     if fixed_mask:
         registration_method.SetMetricFixedMask(fixed_mask)
-
-    # registration_method.AddCommand(
-    #     sitk.sitkIterationEvent, lambda: command_iteration(registration_method)
-    # )
 
     # Execute registration, pull out Euler3DTransform from wrapper
     return registration_method.Execute(
@@ -478,7 +467,7 @@ def resample_slice_pair(
 def framewise_register_pair(
     moving_img,
     ref_img,
-    level=1,
+    level=2,
     interpolation=sitk.sitkBSpline5,
     max_workers=os.cpu_count(),
 ):
@@ -523,6 +512,9 @@ def framewise_register_pair(
 
     del extractor
 
+    # define the shrinking and smoothing based on the upsampled data
+    shrinks, sigmas = estimate_shrinks_sigmas(fixed_upsample, level=level)
+
     com_mask = make_mask(fixed_upsample)
     transforms = [None] * num_volumes
     # Parallel Registration
@@ -534,9 +526,12 @@ def framewise_register_pair(
                     register_pair,
                     fixed=fixed_upsample,
                     moving=volumes[i],
+                    shrinks=shrinks,
+                    sigmas=sigmas,
+                    num_iter=5,
                     com_mask=com_mask,
+                    initial_transform=None,
                     fixed_mask=None,
-                    level=level,
                 )
                 futures[future] = i
             # Collect results
@@ -602,7 +597,11 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                     register_pair,
                     fixed=fixed_upsample,
                     moving=volumes[i],
+                    shrinks=[8, 4, 4, 4],
+                    sigmas=[0.424628 * 8, 0.424628 * 4, 0.424628 * 2, 0.424628],
+                    num_iter=100,
                     com_mask=com_mask,
+                    initial_transform=None,
                     fixed_mask=None,
                 )
                 futures[future] = i
@@ -740,6 +739,10 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                             moving=slicewise_resampled[i],
                             com_mask=com_mask,
                             initial_transform=transforms[i],
+                            shrinks=[8, 4, 4, 4],
+                            sigmas=[0.424628 * 8, 0.424628 * 4, 0.424628 * 2, 0.424628],
+                            num_iter=100,
+                            fixed_mask=None,
                         )
                         futures[future] = i
                     # Collect results
@@ -868,9 +871,11 @@ def main(input_file, output_prefix, slice_moco=False, two_pass_slice_moco=False)
                     fixed=fixed_upsample,
                     moving=slicewise_resampled[i],
                     initial_transform=transforms[i],
+                    shrinks=[2, 2],
+                    sigmas=[0.424628, 0.0],
+                    num_iter=100,
                     com_mask=com_mask,
                     fixed_mask=None,
-                    level=4,
                 )
                 futures[future] = i
             # Collect results

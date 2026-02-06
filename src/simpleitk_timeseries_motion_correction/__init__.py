@@ -39,6 +39,11 @@ from .create_animation import (
     normalize_frame,
 )
 
+# Estimate registration parameters
+from .make_pyramid import (
+    make_pyramid,
+)
+
 __all__ = [
     # Motion correction
     "framewise_register_pair",
@@ -61,4 +66,6 @@ __all__ = [
     # Animation
     "create_ortho_slice_row",
     "normalize_frame",
+    # Estimate registration parameters
+    "make_pyramid",    
 ]
